@@ -32,7 +32,13 @@ def copy_run(
     overwrite: bool,
     do_move: bool,
 ) -> None:
-    """Copy (or move) entries from SRC vault to DST vault."""
+    """Copy (or move) entries from SRC vault to DST vault.
+
+    When --move is specified, entries are deleted from SRC after a
+    successful copy.  Use --key to restrict the operation to specific
+    keys; omitting --key copies/moves all entries.  Pass --overwrite to
+    allow replacing keys that already exist in DST.
+    """
     selected = list(keys) if keys else None
     try:
         if do_move:
