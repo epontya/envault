@@ -1,20 +1,16 @@
-"""Main CLI entry-point for envault."""
+"""Main CLI entry point for envault."""
 
 from __future__ import annotations
 
+import click
 from pathlib import Path
 
-import click
-
 from envault.vault import Vault, VaultNotFoundError
-from envault.cli_profiles import profile_group
-
-DEFAULT_VAULT = Path.home() / ".envault" / "default.vault"
 
 
-def get_vault(vault_path: Path, password: str) -> Vault:
-    """Open an existing vault or create a new one."""
-    return Vault(vault_path, password)
+def get_vault(vault_file: str, password: str) -> Vault:
+    """Return a Vault instance, creating the file if necessary."""
+    return Vault(Path(vault_file), password)
 
 
 @click.group()
@@ -22,71 +18,67 @@ def cli() -> None:
     """envault — secure environment variable manager."""
 
 
-cli.add_command(profile_group)
-
-
 @cli.command("set")
 @click.argument("key")
 @click.argument("value")
-@click.option("--vault", "vault_path", default=str(DEFAULT_VAULT), show_default=True, type=click.Path(path_type=Path))
-@click.password_option("--password", envvar="ENVAULT_PASSWORD", prompt=True)
-def set_cmd(key: str, value: str, vault_path: Path, password: str) -> None:
-    """Set KEY to VALUE in the vault."""
-    vault = get_vault(vault_path, password)
-    vault.set(key, value)
+@click.option("--vault-file", default="vault.db", show_default=True)
+@click.password_option("--password", envvar="ENVAULT_PASSWORD", prompt="Vault password")
+def set_cmd(key: str, value: str, vault_file: str, password: str) -> None:
+    """Set a key/value pair in the vault."""
+    vault = get_vault(vault_file, password)
+    vault.set(key, value, password)
     click.echo(f"Set '{key}'.")
 
 
 @cli.command("get")
 @click.argument("key")
-@click.option("--vault", "vault_path", default=str(DEFAULT_VAULT), show_default=True, type=click.Path(path_type=Path))
-@click.option("--password", envvar="ENVAULT_PASSWORD", prompt=True, hide_input=True)
-def get_cmd(key: str, vault_path: Path, password: str) -> None:
-    """Get the value of KEY from the vault."""
-    try:
-        vault = get_vault(vault_path, password)
-    except VaultNotFoundError:
-        click.echo("Vault not found.", err=True)
-        raise SystemExit(1)
-    value = vault.get(key)
+@click.option("--vault-file", default="vault.db", show_default=True)
+@click.password_option("--password", envvar="ENVAULT_PASSWORD", prompt="Vault password")
+def get_cmd(key: str, vault_file: str, password: str) -> None:
+    """Get a value from the vault."""
+    vault = get_vault(vault_file, password)
+    value = vault.get(key, password)
     if value is None:
-        click.echo(f"Key '{key}' not found.", err=True)
-        raise SystemExit(1)
+        raise click.ClickException(f"Key '{key}' not found.")
     click.echo(value)
 
 
 @cli.command("delete")
 @click.argument("key")
-@click.option("--vault", "vault_path", default=str(DEFAULT_VAULT), show_default=True, type=click.Path(path_type=Path))
-@click.option("--password", envvar="ENVAULT_PASSWORD", prompt=True, hide_input=True)
-def delete_cmd(key: str, vault_path: Path, password: str) -> None:
-    """Delete KEY from the vault."""
-    try:
-        vault = get_vault(vault_path, password)
-    except VaultNotFoundError:
-        click.echo("Vault not found.", err=True)
-        raise SystemExit(1)
+@click.option("--vault-file", default="vault.db", show_default=True)
+@click.password_option("--password", envvar="ENVAULT_PASSWORD", prompt="Vault password")
+def delete_cmd(key: str, vault_file: str, password: str) -> None:
+    """Delete a key from the vault."""
+    vault = get_vault(vault_file, password)
     deleted = vault.delete(key)
-    if deleted:
-        click.echo(f"Deleted '{key}'.")
-    else:
-        click.echo(f"Key '{key}' not found.", err=True)
-        raise SystemExit(1)
+    if not deleted:
+        raise click.ClickException(f"Key '{key}' not found.")
+    click.echo(f"Deleted '{key}'.")
 
 
 @cli.command("list")
-@click.option("--vault", "vault_path", default=str(DEFAULT_VAULT), show_default=True, type=click.Path(path_type=Path))
-@click.option("--password", envvar="ENVAULT_PASSWORD", prompt=True, hide_input=True)
-def list_cmd(vault_path: Path, password: str) -> None:
-    """List all keys stored in the vault."""
-    try:
-        vault = get_vault(vault_path, password)
-    except VaultNotFoundError:
-        click.echo("Vault not found.", err=True)
-        raise SystemExit(1)
-    keys = vault.keys()
+@click.option("--vault-file", default="vault.db", show_default=True)
+@click.password_option("--password", envvar="ENVAULT_PASSWORD", prompt="Vault password")
+def list_cmd(vault_file: str, password: str) -> None:
+    """List all keys in the vault."""
+    vault = get_vault(vault_file, password)
+    keys = vault.list_keys()
     if not keys:
-        click.echo("Vault is empty.")
+        click.echo("No keys found.")
     else:
         for key in sorted(keys):
             click.echo(key)
+
+
+# Register sub-command groups
+from envault.cli_profiles import profile_group  # noqa: E402
+from envault.cli_sync import sync_group  # noqa: E402
+from envault.cli_audit import audit_group  # noqa: E402
+from envault.cli_rotate import rotate_group  # noqa: E402
+from envault.cli_snapshot import snapshot_group  # noqa: E402
+
+cli.add_command(profile_group)
+cli.add_command(sync_group)
+cli.add_command(audit_group)
+cli.add_command(rotate_group)
+cli.add_command(snapshot_group)
