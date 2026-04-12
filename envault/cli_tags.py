@@ -29,7 +29,10 @@ def tag_add(vault_file: str, key: str, tag: str) -> None:
     vault = get_vault(vault_file)
     if vault.get(key) is None:
         raise click.ClickException(f"Key '{key}' not found in vault.")
-    _ts(vault_file).add(key, tag)
+    ts = _ts(vault_file)
+    if tag in ts.get(key):
+        raise click.ClickException(f"Tag '{tag}' already exists on key '{key}'.")
+    ts.add(key, tag)
     click.echo(f"Tagged '{key}' with '{tag}'.")
 
 
