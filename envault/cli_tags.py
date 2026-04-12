@@ -15,6 +15,13 @@ def _ts(vault_file: str) -> TagStore:
     return TagStore(tag_file)
 
 
+def _require_key(vault_file: str, key: str) -> None:
+    """Raise ClickException if KEY does not exist in the vault."""
+    vault = get_vault(vault_file)
+    if vault.get(key) is None:
+        raise click.ClickException(f"Key '{key}' not found in vault.")
+
+
 @click.group("tag")
 def tag_group() -> None:
     """Manage tags on vault entries."""
@@ -26,9 +33,7 @@ def tag_group() -> None:
 @click.argument("tag")
 def tag_add(vault_file: str, key: str, tag: str) -> None:
     """Add TAG to KEY."""
-    vault = get_vault(vault_file)
-    if vault.get(key) is None:
-        raise click.ClickException(f"Key '{key}' not found in vault.")
+    _require_key(vault_file, key)
     ts = _ts(vault_file)
     if tag in ts.get(key):
         raise click.ClickException(f"Tag '{tag}' already exists on key '{key}'.")
@@ -54,6 +59,7 @@ def tag_remove(vault_file: str, key: str, tag: str) -> None:
 @click.argument("key")
 def tag_list(vault_file: str, key: str) -> None:
     """List all tags for KEY."""
+    _require_key(vault_file, key)
     tags = _ts(vault_file).get(key)
     if tags:
         for t in tags:
