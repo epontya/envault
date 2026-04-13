@@ -60,6 +60,12 @@ def test_search_keys_wildcard_all(vault):
     assert len(results) == 6
 
 
+def test_search_keys_returns_dict(vault):
+    """search_keys should always return a plain dict, not a subclass."""
+    results = search_keys(vault, "DB_*")
+    assert type(results) is dict
+
+
 # ---------------------------------------------------------------------------
 # search_values
 # ---------------------------------------------------------------------------
@@ -82,6 +88,12 @@ def test_search_values_case_insensitive_by_default(vault):
 def test_search_values_case_sensitive_no_match(vault):
     results = search_values(vault, "S3CR3T", case_sensitive=True)
     assert results == {}
+
+
+def test_search_values_case_sensitive_match(vault):
+    """Exact-case value should be found when case_sensitive=True."""
+    results = search_values(vault, "s3cr3t", case_sensitive=True)
+    assert "DB_PASSWORD" in results
 
 
 def test_search_values_regex(vault):
